@@ -1,6 +1,9 @@
 import socket
 import threading
 from http import client
+from game import GameState
+
+game=GameState()
 
 SERVER_HOST='127.0.0.1'
 SERVER_PORT=12345
@@ -16,7 +19,11 @@ print(f"TCP server listening on {SERVER_HOST}:{SERVER_PORT}")
 def handle_client(client_socket,client_addr): #client handling/connections
     print(f"Client {client_socket} connected")
     clients.append(client_socket)
+
     while True:
+        client_socket.send("What your username shall be?".encode('utf-8'))
+        nick = client_socket.recv(1024).decode('utf-8').strip()
+        print(f"{client_addr}connected disguised as: {nick}")
         try:
             message = client_socket.recv(1024) #packet size 1024
             if not message:
@@ -24,7 +31,7 @@ def handle_client(client_socket,client_addr): #client handling/connections
             print(f"From {client_addr}:{message}")
             for client in clients:
                 try:
-                    client.send(f"echo: {message}".encode('utf-8')) #echo the received message through all clients
+                    game.handle_message(nick,message.decode('utf-8'))
                 except:
                     clients.remove(client)
         except:

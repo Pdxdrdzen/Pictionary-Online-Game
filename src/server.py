@@ -16,24 +16,19 @@ server.listen()
 clients=[]
 print(f"TCP server listening on {SERVER_HOST}:{SERVER_PORT}")
 
-def handle_client(client_socket,client_addr): #client handling/connections
-    print(f"Client {client_socket} connected")
+def handle_client(client_socket, client_addr):
     clients.append(client_socket)
+    client_socket.send("What your username shall be?".encode('utf-8'))
+    nick = client_socket.recv(1024).decode('utf-8').strip()
+    game.add_player(nick, client_socket)  # add player
+    print(f"{client_addr} connected as: {nick}")
 
     while True:
-        client_socket.send("What your username shall be?".encode('utf-8'))
-        nick = client_socket.recv(1024).decode('utf-8').strip()
-        print(f"{client_addr}connected disguised as: {nick}")
         try:
-            message = client_socket.recv(1024) #packet size 1024
+            message = client_socket.recv(1024)
             if not message:
                 break
-            print(f"From {client_addr}:{message}")
-            for client in clients:
-                try:
-                    game.handle_message(nick,message.decode('utf-8'))
-                except:
-                    clients.remove(client)
+            game.handle_message(nick, message.decode('utf-8'))
         except:
             break
     print(f"Client {client_addr} disconnected") # when clients socket isnt available - the client has probably disconnected

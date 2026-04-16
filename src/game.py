@@ -15,10 +15,13 @@ class GameState:
     def add_player(self,nick,client_socket):
         self.players[nick]=client_socket
         self.scores[nick]=0
-        if len(self.players)==0:
+        print(f"Player {nick} has joined the game, player count: {len(self.players)}")
+        if len(self.players)==2:
+            print("Game started!")
             self._start_game()
     #Setup the game start
     def _start_game(self):
+        print("_start_game triggered")
         nicks=list(self.players.keys())#Only nicknames taken
         self.current_drawer=nicks[0]#role - drawer
         self.current_guesser=nicks[1]#role = guesser
@@ -34,7 +37,7 @@ class GameState:
         self._send(self.current_guesser,{"type":"role","role":"guesser"})
 
     def handle_message(self,nick,raw_msg):
-        msg=json.load(raw_msg)#refactor the JSON string into Python dict
+        msg=json.loads(raw_msg)#refactor the JSON string into Python dict
 
         if self.game_phase!="playing":
             return
@@ -58,10 +61,12 @@ class GameState:
         self._send(self.current_guesser,{"type":"role","role":"guesser"})
 
     def _send(self,nick,message):
-        self.players[nick].send(json.dumps(message).encode('utf-8'))#take the socket of one player, then refactor python dict into JSON string using utf-8 encoding
+        data=json.dumps(message)+ '\n'
+        self.players[nick].send(data.encode('utf-8'))#take the socket of one player, then refactor python dict into JSON string using utf-8 encoding
 
     def _broadcast(self,message):
+        data=json.dumps(message)+ '\n'
         for sock in self.players.values(): #iterate through sockets
-            sock.send(json.dumps(message).encode('utf-8'))#for every socket found, send the same thing
+            sock.send(data.encode('utf-8'))#for every socket found, send the same thing
 
 

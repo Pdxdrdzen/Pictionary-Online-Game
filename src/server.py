@@ -1,4 +1,5 @@
 import socket
+import sys
 import threading
 from http import client
 from game import GameState
@@ -12,6 +13,7 @@ server=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 server.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1) #restart bugfix
 server.bind((SERVER_HOST,SERVER_PORT))
 server.listen()
+server.settimeout(1.0)
 
 clients=[]
 print(f"TCP server listening on {SERVER_HOST}:{SERVER_PORT}")
@@ -36,13 +38,26 @@ def handle_client(client_socket, client_addr):
         clients.remove(client_socket)
     client_socket.close()
 try:
+
     while True:
-        client_socket, client_addr = server.accept()
-        client_thread = threading.Thread(target=handle_client, args=(client_socket,client_addr))
-        client_thread.daemon=True #Automatically killing background threads when the main thread has ended
-        client_thread.start()
+        try:
+            client_socket, client_addr = server.accept()
+            client_thread = threading.Thread(target=handle_client, args=(client_socket,client_addr))
+            client_thread.daemon=True #Automatically killing background threads when the main thread has ended
+            client_thread.start()
+        except socket.timeout:
+            continue
 except KeyboardInterrupt: #Graceful shutdown handling #ctrl+c closes the server#
     print("\nClosing server...")
+    for c in clients:
+        try:
+            c.close()
+        except:
+            #TODO resolve in the future
+            pass
+        server.close()
+        print("Server closed")
+        sys.exit(0)
 finally:
     for client in clients:
         client.close()

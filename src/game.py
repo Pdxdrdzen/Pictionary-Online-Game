@@ -27,11 +27,11 @@ class GameState:
         self.current_guesser=nicks[1]#role = guesser
         self.game_phase="playing"#change gamephase into play
 
-        with open("words/words.txt","r",encoding="utf-8") as f:
+        with open("../words/words.txt","r",encoding="utf-8") as f:
             words=[line.strip() for line in f]
         self.current_word=random.choice(words)
         #Logic to sending the word only to the drawer
-        self._send(self.current_guesser,{"type":"word","word":self.current_word})
+        self._send(self.current_drawer,{"type":"word","word":self.current_word})
 
         self._send(self.current_drawer,{"type":"role","role":"drawer"})
         self._send(self.current_guesser,{"type":"role","role":"guesser"})
@@ -42,7 +42,7 @@ class GameState:
         if self.game_phase!="playing":
             return
         if msg["type"]=="guess" and nick ==self.current_guesser:#Check if the message type is "guess" sent by the guesser
-            if msg["payload"].lower()==self.current_guesser:
+            if msg["payload"].lower()==self.current_word.lower():
                 self.scores[nick]+=1
                 self._broadcast({"type":"correct","player":nick})#let everyone now that *nick* guessed correctly
                 self._switch_turns()
@@ -53,10 +53,10 @@ class GameState:
 
     def _switch_turns(self):
         self.current_drawer,self.current_guesser=self.current_guesser,self.current_drawer
-        with open("words/words.txt","r",encoding="utf-8") as f:
+        with open("../words/words.txt","r",encoding="utf-8") as f:
             words=[line.strip() for line in f]
         self.current_word=random.choice(words)
-        self._send(self.current_guesser,{"type":"word","word":self.current_word})
+        self._send(self.current_drawer,{"type":"word","word":self.current_word})
         self._send(self.current_drawer,{"type":"role","role":"drawer"})
         self._send(self.current_guesser,{"type":"role","role":"guesser"})
 

@@ -101,8 +101,14 @@ def receive_loop():
                         if msg["type"] == "role":
                             my_role = msg["role"]
                             print(f"Moja rola: {my_role}")
+            if not data:
+                print("Server disconnected.")
+                pygame.quit()
+                sys.exit()
         except Exception as e:
             print(f"ERROR: {e}")
+            pygame.quit()
+            sys.exit()
             break
 
 #starting the thread
@@ -125,9 +131,17 @@ while True:
             last_pos = None
 
         if event.type == pygame.MOUSEMOTION and drawing:
-            if last_pos:
+            if last_pos and my_role=="drawer":
                 pygame.draw.line(canvas, brush_color, last_pos, event.pos, brush_size)
-                last_pos = event.pos
+                last_pos=event.pos
+                msg=json.dumps({
+                    "type": "draw",
+                    "x1": last_pos[0], "y1": last_pos[1],
+                    "x2": event.pos[0], "y2": event.pos[1],
+                    "color": list(brush_color),
+                    "size": brush_size
+                })
+                client.send(msg.encode('utf-8'))
         if event.type==pygame.KEYDOWN:
             if event.key == pygame.K_RETURN:
                 print(f"Enter wciśnięty, my_role={my_role}")

@@ -14,6 +14,8 @@ GRAY  = (40,  40,  40)
 LIGHT = (220, 220, 220)
 
 my_role=None
+in_lobby=True
+current_scores={}
 
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -84,8 +86,13 @@ def draw_ui():
         tekst=msg.get("type","")+": "+str(msg.get("payload",msg.get("word","")))
         s=font.render(tekst,True,(100,220,100))
         screen.blit(s,(WIDTH//2,CANVAS_HEIGHT-25*(i+1)))
+    y=CANVAS_HEIGHT+30
+    for player,score in current_scores.items():
+        s=font.render(f"{player}:{score}",True,LIGHT)
+        screen.blit(s,(WIDTH/-200,y))
+        y+=22
 def receive_loop():
-    global my_role  # ← dodaj to!
+    global my_role, in_lobby, current_scores
     buffer = ""
     while True:
         try:
@@ -98,7 +105,10 @@ def receive_loop():
                         msg = json.loads(line)
                         print(f"RECEIVED: {msg}")
                         received_messages.append(msg)
-                        if msg.get("type") == "role":
+                        if msg.get("type")=="lobby":
+                            in_lobby = True
+                        elif msg.get("type") == "role":
+                            in_lobby = False
                             my_role = msg["role"]
                             print(f"Moja rola: {my_role}")
                         elif msg.get("type")=="draw" and my_role=="guesser":
@@ -109,6 +119,10 @@ def receive_loop():
                                 (msg["x2"], msg["y2"]),
                                 msg["size"]
                             )
+                        elif msg.get("type")=="clear_canvas":
+                            canvas.fill(WHITE)
+                        elif msg.get("type")=="scores":
+                            current_scores=msg["scores"]
             if not data:
                 print("Server disconnected.")
                 pygame.quit()
@@ -160,6 +174,13 @@ while True:
                 input_text = input_text[:-1]
             else:
                 input_text += event.unicode
+    if in_lobby:
+        screen.fill(GRAY)
+        lobby_text = font.render("Waiting for other players...", True, WHITE)
+        screen.blit(lobby_text, (WIDTH // 2 - lobby_text.get_width() // 2, HEIGHT // 2))
+        pygame.display.flip()
+        clock.tick(FPS)
+        continue
 
     screen.fill(WHITE)
     screen.blit(canvas, (0, 0))

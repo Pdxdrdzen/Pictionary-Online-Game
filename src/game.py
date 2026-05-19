@@ -15,6 +15,7 @@ class GameState:
     def add_player(self,nick,client_socket):
         self.players[nick]=client_socket
         self.scores[nick]=0
+        self._send(nick, {"type": "lobby", "msg": "Waiting for other players..."})
         print(f"Player {nick} has joined the game, player count: {len(self.players)}")
         if len(self.players)==2:
             print("Game started!")
@@ -52,6 +53,8 @@ class GameState:
             self._send(self.current_guesser,msg)
 
     def _switch_turns(self):
+        self._broadcast({"type":"clear_canvas"})
+        self._broadcast({"type":"scores","scores":self.scores})
         self.current_drawer,self.current_guesser=self.current_guesser,self.current_drawer
         with open("../words/words.txt","r",encoding="utf-8") as f:
             words=[line.strip() for line in f]

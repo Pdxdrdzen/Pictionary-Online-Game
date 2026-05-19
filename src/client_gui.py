@@ -89,7 +89,7 @@ def receive_loop():
     buffer = ""
     while True:
         try:
-            data = client.recv(1024).decode('utf-8')
+            data = client.recv(4096).decode('utf-8')
             if data:
                 buffer += data
                 while '\n' in buffer:
@@ -98,9 +98,17 @@ def receive_loop():
                         msg = json.loads(line)
                         print(f"RECEIVED: {msg}")
                         received_messages.append(msg)
-                        if msg["type"] == "role":
+                        if msg.get("type") == "role":
                             my_role = msg["role"]
                             print(f"Moja rola: {my_role}")
+                        elif msg.get("type")=="draw" and my_role=="guesser":
+                            pygame.draw.line(
+                                canvas,
+                                tuple(msg["color"]),
+                                (msg["x1"], msg["y1"]),
+                                (msg["x2"], msg["y2"]),
+                                msg["size"]
+                            )
             if not data:
                 print("Server disconnected.")
                 pygame.quit()
@@ -133,15 +141,12 @@ while True:
         if event.type == pygame.MOUSEMOTION and drawing:
             if last_pos and my_role=="drawer":
                 pygame.draw.line(canvas, brush_color, last_pos, event.pos, brush_size)
+                dx=event.pos[0]-last_pos[0]
+                dy=event.pos[1]-last_pos[1]
+                if dx*dx + dy*dy > 9:
+                    msg = json.dumps({"type":"draw","x1":last_pos[0],"y1":last_pos[1],"x2":event.pos[0],"y2":event.pos[1],"color":list(brush_color),"size":brush_size})
+                    client.send(msg.encode('utf-8'))
                 last_pos=event.pos
-                msg=json.dumps({
-                    "type": "draw",
-                    "x1": last_pos[0], "y1": last_pos[1],
-                    "x2": event.pos[0], "y2": event.pos[1],
-                    "color": list(brush_color),
-                    "size": brush_size
-                })
-                client.send(msg.encode('utf-8'))
         if event.type==pygame.KEYDOWN:
             if event.key == pygame.K_RETURN:
                 print(f"Enter wciśnięty, my_role={my_role}")

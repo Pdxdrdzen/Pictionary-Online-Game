@@ -16,6 +16,8 @@ LIGHT = (220, 220, 220)
 my_role=None
 in_lobby=True
 current_scores={}
+current_word=None
+notifications=[]
 
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -26,7 +28,6 @@ clock = pygame.time.Clock()
 font=pygame.font.SysFont("Arial", 20)
 input_text=""
 messages=[]
-received_messages = []
 
 client=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect(('127.0.0.1',12345))
@@ -63,6 +64,9 @@ drawing = False
 last_pos = None
 brush_color = BLACK
 brush_size = 4
+def add_notification(text,color=(255,255,255)):
+    expire_time=pygame.time.get_ticks()+2500
+    notifications.append([text,color,expire_time])
 
 def draw_ui():
 
@@ -82,17 +86,22 @@ def draw_ui():
         s=font.render(f">{msg}",True,LIGHT)
         screen.blit(s,(10,CANVAS_HEIGHT-25*(i+1)))
 
-    for i, msg in enumerate(received_messages[-3:]):
-        tekst=msg.get("type","")+": "+str(msg.get("payload",msg.get("word","")))
-        s=font.render(tekst,True,(100,220,100))
-        screen.blit(s,(WIDTH//2,CANVAS_HEIGHT-25*(i+1)))
     y=CANVAS_HEIGHT+30
     for player,score in current_scores.items():
         s=font.render(f"{player}:{score}",True,LIGHT)
-        screen.blit(s,(WIDTH/-200,y))
+        screen.blit(s,(WIDTH-150,y))
         y+=22
+    if my_role=="drawer" and current_word:
+        word_surface=font.render(f"Drawing: {current_word}",True,(255,200,0))
+        screen.blit(word_surface,(WIDTH//2-word_surface.get_width()//2,CANVAS_HEIGHT-35))
+
+    now = pygame.time.get_ticks()
+    notifications[:] = [n for n in notifications if n[2] > now]
+    for i, (text, color, _) in enumerate(notifications):
+        s = font.render(text, True, color)
+        screen.blit(s, (WIDTH // 2 - s.get_width() // 2, 20 + i * 30))
 def receive_loop():
-    global my_role, in_lobby, current_scores
+    global my_role, in_lobby, current_scores,current_word
     buffer = ""
     while True:
         try:
@@ -104,7 +113,13 @@ def receive_loop():
                     if line.strip():
                         msg = json.loads(line)
                         print(f"RECEIVED: {msg}")
-                        received_messages.append(msg)
+                        if msg.get("type") == "correct":
+                            add_notification(f"{msg['player']} zgadł hasło!", (100, 220, 100))
+                        elif msg.get("type") == "clear_canvas":
+                            add_notification("Nowa runda!", (255, 200, 0))
+                            canvas.fill(WHITE)
+                        elif msg.get("type") == "scores":
+                            current_scores = msg["scores"]
                         if msg.get("type")=="lobby":
                             in_lobby = True
                         elif msg.get("type") == "role":
@@ -119,10 +134,8 @@ def receive_loop():
                                 (msg["x2"], msg["y2"]),
                                 msg["size"]
                             )
-                        elif msg.get("type")=="clear_canvas":
-                            canvas.fill(WHITE)
-                        elif msg.get("type")=="scores":
-                            current_scores=msg["scores"]
+                        elif msg.get("type")=="word":
+                            current_word=msg["word"]
             if not data:
                 print("Server disconnected.")
                 pygame.quit()

@@ -1,5 +1,6 @@
 import random
 import json
+import threading
 
 class GameState:
     #Gamestates
@@ -36,6 +37,7 @@ class GameState:
 
         self._send(self.current_drawer,{"type":"role","role":"drawer"})
         self._send(self.current_guesser,{"type":"role","role":"guesser"})
+        self._start_timer()
 
     def handle_message(self,nick,raw_msg):
         msg=json.loads(raw_msg)#refactor the JSON string into Python dict
@@ -53,6 +55,9 @@ class GameState:
             self._send(self.current_guesser,msg)
 
     def _switch_turns(self):
+        if hasattr(self,'timer'):
+            self.timer.cancel()
+        self._start_timer()
         self._broadcast({"type":"clear_canvas"})
         self._broadcast({"type":"scores","scores":self.scores})
         self.current_drawer,self.current_guesser=self.current_guesser,self.current_drawer
@@ -71,5 +76,15 @@ class GameState:
         data=json.dumps(message)+ '\n'
         for sock in self.players.values(): #iterate through sockets
             sock.send(data.encode('utf-8'))#for every socket found, send the same thing
+
+    def _start_timer(self):
+        self._broadcast({"type": "timer", "seconds": 60})
+        self.timer = threading.Timer(60, self._time_up)
+        self.timer.start()
+
+    def _time_up(self):
+       if self.game_phase == "playing":
+           self._broadcast({"type": "time_up", "word": self.current_word})
+           self._switch_turns()
 
 

@@ -19,6 +19,9 @@ current_scores={}
 current_word=None
 notifications=[]
 
+time_left=None
+timer_start=None
+
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption('Pictionary Tcp Online')
@@ -95,13 +98,20 @@ def draw_ui():
         word_surface=font.render(f"Drawing: {current_word}",True,(255,200,0))
         screen.blit(word_surface,(WIDTH//2-word_surface.get_width()//2,CANVAS_HEIGHT-35))
 
+    if time_left is not None:
+        elapsed = (pygame.time.get_ticks() - timer_start) // 1000
+        remaining = max(0, time_left - elapsed)
+        color = (255, 80, 80) if remaining <= 10 else LIGHT
+        t = font.render(f"Czas: {remaining}s", True, color)
+        screen.blit(t, (10, 10))
+
     now = pygame.time.get_ticks()
     notifications[:] = [n for n in notifications if n[2] > now]
     for i, (text, color, _) in enumerate(notifications):
         s = font.render(text, True, color)
         screen.blit(s, (WIDTH // 2 - s.get_width() // 2, 20 + i * 30))
 def receive_loop():
-    global my_role, in_lobby, current_scores,current_word
+    global my_role, in_lobby, current_scores,current_word,time_left,timer_start
     buffer = ""
     while True:
         try:
@@ -136,6 +146,12 @@ def receive_loop():
                             )
                         elif msg.get("type")=="word":
                             current_word=msg["word"]
+                        elif msg.get("type") == "timer":
+                            time_left = msg["seconds"]
+                            timer_start = pygame.time.get_ticks()
+                        elif msg.get("type") == "time_up":
+                            add_notification(f"Czas minąl! Hasło to: {msg['word']}", (255, 80, 80))
+                            time_left = None
             if not data:
                 print("Server disconnected.")
                 pygame.quit()

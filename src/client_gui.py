@@ -42,6 +42,12 @@ time_left      = None
 timer_start    = None
 messages       = []
 particles      = []
+screen_state = "menu"    # menu | join_input | lobby | game
+room_code = ""
+room_owner = ""
+lobby_players = []
+is_owner = False
+join_code_input = ""
 
 active_gif = {
     "name": None,       # GIF key
@@ -186,6 +192,7 @@ while waiting_for_nick:
             if event.key == pygame.K_RETURN and nick.strip():
                 client.send(nick.encode("utf-8"))
                 waiting_for_nick = False
+                screen_state="menu"
             elif event.key == pygame.K_BACKSPACE:
                 nick = nick[:-1]
             else:
@@ -325,8 +332,102 @@ def draw_ui():
             screen.blit(shadow, (WIDTH//2 - w2//2 + 3, 85 + i*55 + 3))
             screen.blit(ns, (WIDTH//2 - w2//2, 85 + i*55))
 
+def draw_menu():
+    draw_gradient_bg()
+    t2 = pygame.time.get_ticks() / 1000
+    # animated circle "loadingg"
+    for i in range(6):
+        angle = t2 * 0.7 + i * math.pi / 3
+        x = WIDTH//2 + int(math.cos(angle) * 180)
+        y = HEIGHT//2 + int(math.sin(angle) * 70)
+        r = 16 + int(math.sin(t2*2+i)*5)
+        cols = [ACCENT1, ACCENT2, ACCENT3, ACCENT4, RED_HOT, ACCENT1]
+        gs = pygame.Surface((r*3, r*3), pygame.SRCALPHA)
+        pygame.draw.circle(gs, (*cols[i], 60), (r+r//2, r+r//2), r+r//2)
+        screen.blit(gs, (x-r-r//2, y-r-r//2))
+        pygame.draw.circle(screen, cols[i], (x, y), r)
+
+    title = font_big.render("PICTIONARY TCP ONLINE", True, ACCENT3)
+    screen.blit(title, (WIDTH//2 - title.get_width()//2, HEIGHT//2 - 160))
+
+    draw_panel(screen, (WIDTH//2 - 160, HEIGHT//2 - 80, 320, 220), radius=16)
+
+    # buttons
+    buttons = [
+        ("Utwórz pokój",    ACCENT2, HEIGHT//2 - 50),
+        ("Dołącz do pokoju", ACCENT4, HEIGHT//2 + 10),
+        ("Wyjdź",           RED_HOT,  HEIGHT//2 + 70),
+    ]
+    for label, color, by in buttons:
+        pygame.draw.rect(screen, color, (WIDTH//2-120, by, 240, 44), border_radius=10)
+        txt = font_med.render(label, True, BLACK)
+        screen.blit(txt, (WIDTH//2 - txt.get_width()//2, by + 10))
+
+    pygame.display.flip()
+
+def draw_join_screen():
+    draw_gradient_bg()
+    draw_panel(screen, (WIDTH//2 - 220, HEIGHT//2 - 100, 440, 200), radius=16)
+
+    title = font_med.render("Wpisz kod pokoju:", True, ACCENT2)
+    screen.blit(title, (WIDTH//2 - title.get_width()//2, HEIGHT//2 - 80))
+
+    # text field with code
+    pygame.draw.rect(screen, INPUT_BG, (WIDTH//2-120, HEIGHT//2-30, 240, 50), border_radius=10)
+    pygame.draw.rect(screen, ACCENT2,  (WIDTH//2-120, HEIGHT//2-30, 240, 50), width=2, border_radius=10)
+    code_surf = font_big.render(join_code_input.upper(), True, WHITE)
+    screen.blit(code_surf, (WIDTH//2 - code_surf.get_width()//2, HEIGHT//2 - 20))
+
+    # buttons
+    pygame.draw.rect(screen, ACCENT4, (WIDTH//2-110, HEIGHT//2+40, 100, 38), border_radius=8)
+    ok = font_med.render("Dołącz", True, BLACK)
+    screen.blit(ok, (WIDTH//2-110 + 50 - ok.get_width()//2, HEIGHT//2+49))
+
+    pygame.draw.rect(screen, RED_HOT, (WIDTH//2+10, HEIGHT//2+40, 100, 38), border_radius=8)
+    back = font_med.render("Wróć", True, BLACK)
+    screen.blit(back, (WIDTH//2+10 + 50 - back.get_width()//2, HEIGHT//2+49))
+
+    pygame.display.flip()
+
+def draw_lobby():
+    draw_gradient_bg()
+    draw_panel(screen, (WIDTH//2 - 240, 80, 480, 460), radius=16)
+
+    # room code
+    code_label = font_big.render(f"Kod pokoju: {room_code}", True, ACCENT3)
+    screen.blit(code_label, (WIDTH//2 - code_label.get_width()//2, 110))
+
+    hint = font_small.render("Podaj ten kod znajomym!", True, (150,130,200))
+    screen.blit(hint, (WIDTH//2 - hint.get_width()//2, 150))
+
+    # player list
+    players_label = font_med.render("Gracze w lobby:", True, ACCENT2)
+    screen.blit(players_label, (WIDTH//2 - players_label.get_width()//2, 190))
+
+    for i, p in enumerate(lobby_players):
+        crown = "  👑" if p == room_owner else ""
+        color = ACCENT3 if p == room_owner else WHITE
+        ps = font_med.render(f"{p}{crown}", True, color)
+        screen.blit(ps, (WIDTH//2 - ps.get_width()//2, 230 + i * 38))
+
+    # start button
+    if is_owner:
+        can_start = len(lobby_players) >= 2
+        btn_color = ACCENT4 if can_start else (60, 80, 60)
+        pygame.draw.rect(screen, btn_color, (WIDTH//2-130, 470, 260, 50), border_radius=12)
+        btn_txt = font_med.render("▶  Startuj grę!", True, BLACK if can_start else (100,100,100))
+        screen.blit(btn_txt, (WIDTH//2 - btn_txt.get_width()//2, 483))
+        if not can_start:
+            sub = font_tiny.render("Potrzeba min. 2 graczy", True, (150,130,200))
+            screen.blit(sub, (WIDTH//2 - sub.get_width()//2, 527))
+    else:
+        wait = font_small.render(f"Czekaj aż {room_owner} wystartuje...", True, (150,130,200))
+        screen.blit(wait, (WIDTH//2 - wait.get_width()//2, 490))
+
+    pygame.display.flip()
 def receive_loop():
     global my_role, in_lobby, current_scores, current_word, time_left, timer_start
+    global screen_state, room_owner, room_code, lobby_players, is_owner
     buffer = ""
     while True:
         try:
@@ -380,6 +481,32 @@ def receive_loop():
                             add_notification("REMIS! QUICK SHOT - 10 SEKUND!", RED_HOT)
                             play_gif("quick_shot")
                             spawn_particles(WIDTH//2, HEIGHT//2, RED_HOT, 50)
+                        elif t == "room_created":
+                            room_code = msg["code"]
+                            is_owner = True
+                            room_owner = nick
+                            screen_state = "lobby"
+
+                        elif t == "joined_room":
+                            room_code = msg["code"]
+                            room_owner = msg["owner"]
+                            is_owner = False
+                            screen_state = "lobby"
+
+                        elif t == "lobby_update":
+                            lobby_players = msg["players"]
+                            room_owner = msg["owner"]
+
+                        elif t == "game_start":
+                            screen_state = "game"
+                            in_lobby = False
+
+                        elif t == "return_to_lobby":
+                            screen_state = "lobby"
+                            canvas.fill(WHITE)
+                            time_left = None
+                            current_word = None
+                            my_role = None
             if not data:
                 pygame.quit(); sys.exit()
         except Exception as e:
@@ -445,33 +572,66 @@ while True:
             else:
                 input_text += event.unicode
 
-    if in_lobby:
-        draw_gradient_bg()
-        t2 = now / 1000
-        for i in range(8):
-            angle = t2*0.5 + i*math.pi/4
-            x = WIDTH//2 + int(math.cos(angle)*200)
-            y = HEIGHT//2 + int(math.sin(angle)*80)
-            r = 14+int(math.sin(t2*3+i)*5)
-            cols = [ACCENT1,ACCENT2,ACCENT3,ACCENT4,RED_HOT,ACCENT1,ACCENT2,ACCENT3]
-            gs = pygame.Surface((r*3, r*3), pygame.SRCALPHA)
-            pygame.draw.circle(gs, (*cols[i],80), (r+r//2,r+r//2), r+r//2)
-            screen.blit(gs, (x-r-r//2, y-r-r//2))
-            pygame.draw.circle(screen, cols[i], (x,y), r)
-        dots = "." * ((now//500)%4)
-        ls = font_big.render(f"Czekam na gracza{dots}", True, WHITE)
-        screen.blit(ls, (WIDTH//2 - ls.get_width()//2, HEIGHT//2 - 20))
-        hint = font_small.render("Gra zacznie sie gdy dolazy drugi gracz", True, (150,130,200))
-        screen.blit(hint, (WIDTH//2 - hint.get_width()//2, HEIGHT//2+30))
-        pygame.display.flip()
-        continue
+        if screen_state=="menu":
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mx, my2 = event.pos
+                # create room
+                if WIDTH // 2 - 120 <= mx <= WIDTH // 2 + 120 and HEIGHT // 2 - 50 <= my2 <= HEIGHT // 2 - 6:
+                    client.send(json.dumps({"type": "create_room", "player": nick}).encode())
+                # join room
+                if WIDTH // 2 - 120 <= mx <= WIDTH // 2 + 120 and HEIGHT // 2 + 10 <= my2 <= HEIGHT // 2 + 54:
+                    screen_state = "join_input"
+                # exit
+                if WIDTH // 2 - 120 <= mx <= WIDTH // 2 + 120 and HEIGHT // 2 + 70 <= my2 <= HEIGHT // 2 + 114:
+                    pygame.quit();
+                    sys.exit()
+        elif screen_state=="join_input":
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN and len(join_code_input) > 0:
+                    client.send(json.dumps({"type": "join_room",
+                                            "code": join_code_input.upper(),
+                                            "player": nick}).encode())
+                elif event.key == pygame.K_BACKSPACE:
+                    join_code_input = join_code_input[:-1]
+                elif event.key == pygame.K_ESCAPE:
+                    screen_state = "menu"
+                    join_code_input = ""
+                elif len(join_code_input) < 6:
+                    join_code_input += event.unicode.upper()
 
-    draw_gradient_bg()
-    glow_color = ACCENT1 if my_role=="drawer" else ACCENT2
-    draw_glow_rect(screen, glow_color, (CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H), radius=6, glow_size=10)
-    screen.blit(canvas, (CANVAS_X, CANVAS_Y))
-    pygame.draw.rect(screen, glow_color, (CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H), width=2, border_radius=6)
-    update_draw_particles(screen)
-    draw_ui()
-    draw_active_gif()
-    pygame.display.flip()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mx, my2 = event.pos
+                # Join
+                if WIDTH // 2 - 110 <= mx <= WIDTH // 2 - 10 and HEIGHT // 2 + 40 <= my2 <= HEIGHT // 2 + 78:
+                    if join_code_input:
+                        client.send(json.dumps({"type": "join_room",
+                                                "code": join_code_input.upper(),
+                                                "player": nick}).encode())
+                # Back
+                if WIDTH // 2 + 10 <= mx <= WIDTH // 2 + 110 and HEIGHT // 2 + 40 <= my2 <= HEIGHT // 2 + 78:
+                    screen_state = "menu"
+                    join_code_input = ""
+        elif screen_state=="lobby":
+            if event.type == pygame.MOUSEBUTTONDOWN and is_owner:
+                mx, my2 = event.pos
+                if WIDTH // 2 - 130 <= mx <= WIDTH // 2 + 130 and 470 <= my2 <= 520:
+                    if len(lobby_players) >= 2:
+                        client.send(json.dumps({"type": "start_game",
+                                                "player": nick}).encode())
+    if screen_state=="menu":
+        draw_menu()
+    elif screen_state=="join_input":
+        draw_join_screen()
+    elif screen_state=="lobby":
+        draw_lobby()
+    elif screen_state=="game":
+        draw_gradient_bg()
+        glow_color = ACCENT1 if my_role == "drawer" else ACCENT2
+        draw_glow_rect(screen, glow_color, (CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H), radius=6, glow_size=10)
+        screen.blit(canvas, (CANVAS_X, CANVAS_Y))
+        pygame.draw.rect(screen, glow_color, (CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H), width=2, border_radius=6)
+        update_draw_particles(screen)
+        draw_ui()
+        draw_active_gif()
+        pygame.display.flip()
+

@@ -4,19 +4,25 @@ import threading
 
 class GameState:
     #Gamestates
-    def __init__(self):
-        self.players={}
+    def __init__(self,player_list,socket_map):
+        self.players={nick:sock for sock, nick in socket_map.items() if nick in player_list}
         self.current_word=None
         self.current_drawer=None
         self.current_guesser=None
-        self.scores={}
+        self.scores={nick: 0 for nick in player_list}
         self.game_phase="lobby"
-        self.max_rounds=4
+        self.max_rounds=len(player_list)*2
         self.current_round=0
         self.quick_shot=False
+        self.player_order=player_list
 
-#add players to the dict, initialize players
+    def start(self):
+        self._start_game()
+
+        # add players to the dict, initialize players(currently passing)
+
     def add_player(self,nick,client_socket):
+        pass
         self.players[nick]=client_socket
         self.scores[nick]=0
         self._send(nick, {"type": "lobby", "msg": "Waiting for other players..."})

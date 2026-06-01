@@ -11,6 +11,9 @@ class GameState:
         self.current_guesser=None
         self.scores={}
         self.game_phase="lobby"
+        self.max_rounds=4
+        self.current_round=0
+        self.quick_shot=False
 
 #add players to the dict, initialize players
     def add_player(self,nick,client_socket):
@@ -55,6 +58,16 @@ class GameState:
             self._send(self.current_guesser,msg)
 
     def _switch_turns(self):
+        if self.quick_shot:
+            scores = list(self.scores.values())
+            if scores[0] != scores[1]:  # ktoś wyszedł na prowadzenie
+                self.quick_shot = False
+                self._end_game()
+                return
+        self.current_round+=1
+        if self.current_round>=self.max_rounds:
+            self._end_game()
+            return
         if hasattr(self,'timer'):
             self.timer.cancel()
         self._start_timer()
@@ -68,6 +81,7 @@ class GameState:
         self._send(self.current_drawer,{"type":"role","role":"drawer"})
         self._send(self.current_guesser,{"type":"role","role":"guesser"})
 
+
     def _send(self,nick,message):
         data=json.dumps(message)+ '\n'
         self.players[nick].send(data.encode('utf-8'))#take the socket of one player, then refactor python dict into JSON string using utf-8 encoding
@@ -78,13 +92,30 @@ class GameState:
             sock.send(data.encode('utf-8'))#for every socket found, send the same thing
 
     def _start_timer(self):
-        self._broadcast({"type": "timer", "seconds": 60})
-        self.timer = threading.Timer(60, self._time_up)
+        seconds = 10 if self.quick_shot else 60
+        self._broadcast({"type": "timer", "seconds": seconds})
+        self.timer = threading.Timer(seconds, self._time_up)
         self.timer.start()
 
     def _time_up(self):
        if self.game_phase == "playing":
            self._broadcast({"type": "time_up", "word": self.current_word})
            self._switch_turns()
+
+    def _end_game(self):
+        if hasattr(self, 'timer'):
+            self.timer.cancel()
+        scores = list(self.scores.values())
+        if scores[0] == scores[1]:  # remis!
+            self.game_phase = "playing"
+            self.current_round = 0
+            self.max_rounds = 999  # nieskończone rundy aż ktoś wygra
+            self._broadcast({"type": "quick_shot", "msg": "Remis! Kto pierwszy odgadnie haslo wygrywa! Runda - 10 sekund!"})
+            self.quick_shot = True
+            self._switch_turns()
+        else:
+            winner = max(self.scores, key=self.scores.get)
+            self._broadcast({"type": "game_over", "winner": winner, "scores": self.scores})
+            self.game_phase = "lobby"
 
 
